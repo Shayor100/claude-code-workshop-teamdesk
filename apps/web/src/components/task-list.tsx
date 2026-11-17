@@ -8,6 +8,7 @@ import {
 
 interface TaskListProps {
   disabled: boolean;
+  emptyMessage: string;
   members: readonly Member[];
   onAssign: (taskId: string, assigneeId: string | null) => void;
   onComplete: (taskId: string) => void;
@@ -16,6 +17,7 @@ interface TaskListProps {
 
 export default function TaskList({
   disabled,
+  emptyMessage,
   members,
   onAssign,
   onComplete,
@@ -38,11 +40,7 @@ export default function TaskList({
   );
 
   if (tasks.length === 0) {
-    return (
-      <p className="text-muted-foreground text-sm">
-        No tasks yet. Add the first one above.
-      </p>
-    );
+    return <p className="text-muted-foreground text-sm">{emptyMessage}</p>;
   }
   return (
     <ul className="m-0 list-none space-y-4 p-0">
