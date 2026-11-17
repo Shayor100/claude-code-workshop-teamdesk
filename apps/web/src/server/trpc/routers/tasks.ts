@@ -22,12 +22,24 @@ export const tasksRouter = router({
     .mutation(({ ctx, input }) =>
       ctx.services.tasks.complete(input.actorId, input.taskId)
     ),
+  counts: publicProcedure.query(({ ctx }) =>
+    ctx.services.tasks.counts(todayUtc())
+  ),
   create: publicProcedure
     .input(z.object({ actorId: z.string(), task: createTaskInput }))
     .mutation(({ ctx, input }) =>
       ctx.services.tasks.create(input.actorId, input.task, todayUtc())
     ),
   list: publicProcedure
-    .input(z.object({ assigneeId: z.string().optional() }).optional())
-    .query(({ ctx, input }) => ctx.services.tasks.list(input, todayUtc())),
+    .input(
+      z
+        .object({
+          assigneeId: z.string().optional(),
+          view: z.enum(["open", "overdue", "week", "done"]).optional(),
+        })
+        .optional()
+    )
+    .query(({ ctx, input }) =>
+      ctx.services.tasks.list(input ?? {}, todayUtc())
+    ),
 });
