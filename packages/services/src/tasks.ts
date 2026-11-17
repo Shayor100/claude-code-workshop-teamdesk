@@ -1,7 +1,13 @@
 import type { Database } from "@repo/db";
-import { TASK_TITLE_MAX_LENGTH, type Task } from "@repo/db/shared";
+import {
+  TASK_TITLE_MAX_LENGTH,
+  type Task,
+  type TaskCounts,
+  type TaskView,
+} from "@repo/db/shared";
 import {
   completeTask,
+  countTasks,
   getTask,
   insertTask,
   listTasks,
@@ -34,13 +40,28 @@ export interface TasksService {
   ) => Promise<Task>;
   /** The assignee, the creator or an admin may complete a task. */
   complete: (actorId: string, taskId: string) => Promise<Task>;
+  /** Task counts per view, over all tasks. `today` is YYYY-MM-DD. */
+  counts: (today: string) => Promise<TaskCounts>;
   /** Throws on a missing assignee or a due date in the past. */
   create: (
     actorId: string,
     input: CreateTaskInput,
     today: string
   ) => Promise<Task>;
-  list: (filter?: { assigneeId?: string }) => Promise<Task[]>;
+  /** `view` defaults to "open". `today` is YYYY-MM-DD. */
+  list: (
+    filter: { assigneeId?: string; view?: TaskView } | undefined,
+    today: string
+  ) => Promise<Task[]>;
+}
+
+const DAY_MS = 86_400_000;
+const WEEK_DAYS_AFTER_TODAY = 6;
+
+/** Last day of the "due this week" window: today + 6 days, inclusive. */
+function weekEndOf(today: string): string {
+  const ms = Date.parse(`${today}T00:00:00Z`) + WEEK_DAYS_AFTER_TODAY * DAY_MS;
+  return new Date(ms).toISOString().slice(0, 10);
 }
 
 export const createTasksService = (db: Database): TasksService => ({
@@ -76,6 +97,7 @@ export const createTasksService = (db: Database): TasksService => ({
     }
     return done;
   },
+  counts: (today) => countTasks(db, today, weekEndOf(today)),
   // `today` comes from the caller (YYYY-MM-DD) so the rule is testable and the
   // service never reads the clock for a business decision.
   create: async (actorId, input, today) => {
@@ -89,5 +111,11 @@ export const createTasksService = (db: Database): TasksService => ({
     }
     return await insertTask(db, { ...data, createdById: actorId });
   },
-  list: (filter) => listTasks(db, filter),
+  list: (filter, today) =>
+    listTasks(db, {
+      ...filter,
+      today,
+      view: filter?.view ?? "open",
+      weekEnd: weekEndOf(today),
+    }),
 });

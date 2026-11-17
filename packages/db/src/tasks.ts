@@ -1,6 +1,18 @@
-import { and, asc, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  isNotNull,
+  isNull,
+  lt,
+  lte,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { type Database, tasks } from "./schema.ts";
-import type { Task } from "./shared.ts";
+import type { Task, TaskCounts, TaskView } from "./shared.ts";
 
 type TaskRow = typeof tasks.$inferSelect;
 
@@ -16,30 +28,85 @@ function toTask(row: TaskRow): Task {
   };
 }
 
+function viewCondition(
+  view: TaskView,
+  today: string,
+  weekEnd: string
+): SQL | undefined {
+  switch (view) {
+    case "open":
+      return isNull(tasks.completedAt);
+    case "overdue":
+      return and(isNull(tasks.completedAt), lt(tasks.dueOn, today));
+    case "week":
+      return and(
+        isNull(tasks.completedAt),
+        gte(tasks.dueOn, today),
+        lte(tasks.dueOn, weekEnd)
+      );
+    case "done":
+      return isNotNull(tasks.completedAt);
+    default:
+      return;
+  }
+}
+
 /**
  * Open tasks first, ordered by due date (undated last), then done tasks,
- * most recently completed first.
+ * most recently completed first. `view` narrows the list; `today` and
+ * `weekEnd` (YYYY-MM-DD, inclusive) are needed for "overdue" and "week".
+ * Without a view every task is returned.
  */
 export async function listTasks(
   db: Database,
-  filter: { assigneeId?: string } = {}
+  filter: {
+    assigneeId?: string;
+    today?: string;
+    view?: TaskView;
+    weekEnd?: string;
+  } = {}
 ): Promise<Task[]> {
   const rows = await db
     .select()
     .from(tasks)
     .where(
-      filter.assigneeId
-        ? eq(tasks.assigneeId, Number(filter.assigneeId))
-        : undefined
+      and(
+        filter.assigneeId
+          ? eq(tasks.assigneeId, Number(filter.assigneeId))
+          : undefined,
+        filter.view
+          ? viewCondition(filter.view, filter.today ?? "", filter.weekEnd ?? "")
+          : undefined
+      )
     )
     .orderBy(
       asc(isNotNull(tasks.completedAt)),
+      desc(tasks.completedAt),
       asc(sql`${tasks.dueOn} is null`),
       asc(tasks.dueOn),
-      desc(tasks.completedAt),
       asc(tasks.id)
     );
   return rows.map(toTask);
+}
+
+/** Task counts per view, over all tasks. Matches what `listTasks` returns. */
+export async function countTasks(
+  db: Database,
+  today: string,
+  weekEnd: string
+): Promise<TaskCounts> {
+  const counts: TaskCounts = { done: 0, open: 0, overdue: 0, week: 0 };
+  const views = Object.keys(counts) as TaskView[];
+  await Promise.all(
+    views.map(async (view) => {
+      const [row] = await db
+        .select({ n: sql<number>`count(*)` })
+        .from(tasks)
+        .where(viewCondition(view, today, weekEnd));
+      counts[view] = Number(row?.n ?? 0);
+    })
+  );
+  return counts;
 }
 
 export async function getTask(db: Database, id: string): Promise<Task | null> {

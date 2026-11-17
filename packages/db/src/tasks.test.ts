@@ -3,6 +3,7 @@ import { createMember } from "./members.ts";
 import type { Database } from "./schema.ts";
 import {
   completeTask,
+  countTasks,
   getTask,
   insertTask,
   listTasks,
@@ -60,5 +61,35 @@ describe("tasks", () => {
     expect(
       (await listTasks(db, { assigneeId: memberId })).map((t) => t.title)
     ).toEqual(["Ship it"]);
+  });
+
+  test("listTasks views and countTasks", async () => {
+    await addTask("undated");
+    await addTask("yesterday", "2026-10-22");
+    await addTask("today", "2026-10-23");
+    await addTask("plus6", "2026-10-29");
+    await addTask("plus7", "2026-10-30");
+    const done = await addTask("done", "2026-10-01");
+    await completeTask(db, done.id);
+    const f = { today: "2026-10-23", weekEnd: "2026-10-29" };
+    const titles = async (view: "open" | "overdue" | "week" | "done") =>
+      (await listTasks(db, { ...f, view })).map((t) => t.title);
+
+    expect(await titles("open")).toEqual([
+      "yesterday",
+      "today",
+      "plus6",
+      "plus7",
+      "undated",
+    ]);
+    expect(await titles("overdue")).toEqual(["yesterday"]);
+    expect(await titles("week")).toEqual(["today", "plus6"]);
+    expect(await titles("done")).toEqual(["done"]);
+    expect(await countTasks(db, f.today, f.weekEnd)).toEqual({
+      done: 1,
+      open: 5,
+      overdue: 1,
+      week: 2,
+    });
   });
 });

@@ -53,6 +53,9 @@ export interface Task {
   title: string;
 }
 
+export type TaskView = "open" | "overdue" | "week" | "done";
+export type TaskCounts = Record<TaskView, number>;
+
 export interface Announcement {
   authorId: string;
   body: string;

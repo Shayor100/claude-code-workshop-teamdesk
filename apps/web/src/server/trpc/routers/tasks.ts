@@ -29,5 +29,5 @@ export const tasksRouter = router({
     ),
   list: publicProcedure
     .input(z.object({ assigneeId: z.string().optional() }).optional())
-    .query(({ ctx, input }) => ctx.services.tasks.list(input)),
+    .query(({ ctx, input }) => ctx.services.tasks.list(input, todayUtc())),
 });
