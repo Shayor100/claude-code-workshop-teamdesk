@@ -1,5 +1,7 @@
 # Teamdesk
 
+> **My workshop demo.** I forked this app at the Claude Community Australia Claude Code workshop and used Claude Code to build **task views**: Open / Overdue / Due this week / Done tabs with live counts on `/tasks`, written spec-first and added through the db, service and tRPC layers ([spec](docs/specs/task-views.md)).
+
 Rooms, bookings and tasks for a small team. A [TanStack Start](https://tanstack.com/start) app on Cloudflare Workers with D1, built from [cf-tanstack-boilerplate](https://github.com/codewithpassion/cf-tanstack-boilerplate).
 
 ## Develop
